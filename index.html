@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-C6 LED Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .led-indicator {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            background: #ccc;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .led-indicator.on {
+            background: #4CAF50;
+            box-shadow: 0 0 30px #4CAF50, 0 0 60px #4CAF50;
+        }
+        
+        .led-indicator.off {
+            background: #666;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .status-text {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .status-subtext {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        #btnOn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+        }
+        
+        #btnOn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        #btnOff {
+            background: linear-gradient(135deg, #f44336, #da190b);
+        }
+        
+        #btnOff:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        #message {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: 500;
+            display: none;
+        }
+        
+        #message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        #message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .info-section {
+            background: #e3f2fd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+        
+        .info-section strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 ESP32-C6 LED Control</h1>
+        <p class="subtitle">Control your LED from anywhere in the world</p>
+        
+        <div class="status-card">
+            <div id="ledIndicator" class="led-indicator off"></div>
+            <div class="status-text" id="statusText">OFF</div>
+            <div class="status-subtext">Current LED State</div>
+        </div>
+        
+        <div class="button-group">
+            <button id="btnOn" onclick="controlLED(1)">
+                Turn ON
+            </button>
+            <button id="btnOff" onclick="controlLED(0)">
+                Turn OFF
+            </button>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div class="info-section">
+            <strong>ThingSpeak Channel:</strong>
+            Channel ID: 3212734<br>
+            Updates every 5 seconds on ESP32
+        </div>
+    </div>
+
+    <script>
+        // ThingSpeak Configuration
+        const WRITE_API_KEY = 'XCHP3AQIJTGU3F9O'; // Replace with your Write API Key
+        const CHANNEL_ID = '3212734';
+        const READ_API_KEY = 'KWKE4RUZBO0AP4ZF';
+        
+        let currentState = 0;
+
+        // Function to control LED
+        async function controlLED(state) {
+            const btnOn = document.getElementById('btnOn');
+            const btnOff = document.getElementById('btnOff');
+            const message = document.getElementById('message');
+            
+            // Disable buttons during request
+            btnOn.disabled = true;
+            btnOff.disabled = true;
+            
+            message.textContent = 'Sending command...';
+            message.className = '';
+            message.style.display = 'block';
+            
+            try {
+                // Update ThingSpeak channel (using HTTP for compatibility)
+                const url = `http://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=${state}`;
+                const response = await fetch(url);
+                const result = await response.text();
+                
+                if (result !== '0') {
+                    currentState = state;
+                    updateUI();
+                    message.textContent = `LED turned ${state === 1 ? 'ON' : 'OFF'} successfully!`;
+                    message.className = 'success';
+                    
+                    // Hide message after 3 seconds
+                    setTimeout(() => {
+                        message.style.display = 'none';
+                    }, 3000);
+                } else {
+                    throw new Error('Failed to update ThingSpeak');
+                }
+            } catch (error) {
+                message.textContent = 'Error: ' + error.message;
+                message.className = 'error';
+            } finally {
+                // Re-enable buttons
+                btnOn.disabled = false;
+                btnOff.disabled = false;
+            }
+        }
+        
+        // Update UI based on current state
+        function updateUI() {
+            const indicator = document.getElementById('ledIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            if (currentState === 1) {
+                indicator.className = 'led-indicator on';
+                statusText.textContent = 'ON';
+            } else {
+                indicator.className = 'led-indicator off';
+                statusText.textContent = 'OFF';
+            }
+        }
+        
+        // Read current state from ThingSpeak
+        async function readCurrentState() {
+            try {
+                const url = `http://api.thingspeak.com/channels/${CHANNEL_ID}/fields/1.json?api_key=${READ_API_KEY}&results=1`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.feeds && data.feeds.length > 0) {
+                    const lastValue = parseInt(data.feeds[0].field1);
+                    if (lastValue === 0 || lastValue === 1) {
+                        currentState = lastValue;
+                        updateUI();
+                    }
+                }
+            } catch (error) {
+                console.error('Error reading current state:', error);
+            }
+        }
+        
+        // Initialize - read current state on page load
+        readCurrentState();
+        
+        // Optionally, poll for updates every 10 seconds
+        setInterval(readCurrentState, 10000);
+    </script>
+</body>
+</html>
