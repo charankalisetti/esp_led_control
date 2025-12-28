@@ -231,7 +231,7 @@
             
             try {
                 // Update ThingSpeak channel (using HTTP for compatibility)
-                const url = `http://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=${state}`;
+                const url = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=${state}`;
                 const response = await fetch(url);
                 const result = await response.text();
                 
@@ -275,7 +275,7 @@
         // Read current state from ThingSpeak
         async function readCurrentState() {
             try {
-                const url = `http://api.thingspeak.com/channels/${CHANNEL_ID}/fields/1.json?api_key=${READ_API_KEY}&results=1`;
+                const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/1.json?api_key=${READ_API_KEY}&results=1`;
                 const response = await fetch(url);
                 const data = await response.json();
                 
@@ -300,3 +300,4 @@
 </body>
 
 </html>
+
